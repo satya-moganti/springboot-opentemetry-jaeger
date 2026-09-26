@@ -1258,46 +1258,7 @@ This project includes comprehensive documentation for all components:
 | Document | Description |
 |----------|-------------|
 | [README.md](README.md) | This file - complete project overview |
-| [BUILD_GUIDE.md](BUILD_GUIDE.md) | Detailed build instructions and troubleshooting |
-| [ARCHITECTURE_DIAGRAM.md](ARCHITECTURE_DIAGRAM.md) | Detailed system architecture with diagrams |
-| [ARCHITECTURE_SUMMARY.md](ARCHITECTURE_SUMMARY.md) | Quick architecture overview |
-| [JAVA_VERSION_COMPATIBILITY.md](JAVA_VERSION_COMPATIBILITY.md) | Java 17-21 compatibility configuration guide |
 
-### **Feature Guides**
-
-| Document | Description |
-|----------|-------------|
-| [FEIGN_MIGRATION.md](FEIGN_MIGRATION.md) | RestTemplate → FeignClient migration guide |
-| [EXCEPTION_HANDLING_GUIDE.md](EXCEPTION_HANDLING_GUIDE.md) | Complete exception handling documentation |
-| [CONTROLLER_INTEGRATION_GUIDE.md](CONTROLLER_INTEGRATION_GUIDE.md) | Controller integration with exception handlers |
-| [ENHANCEMENTS_GUIDE.md](ENHANCEMENTS_GUIDE.md) | Circuit breaker, testing, and logging setup |
-| [PORT_VALIDATION_GUIDE.md](PORT_VALIDATION_GUIDE.md) | Port availability checking and conflict resolution |
-
-### **Build & Configuration**
-
-| Document | Description |
-|----------|-------------|
-| [POM_GRADLE_SYNC.md](POM_GRADLE_SYNC.md) | Maven and Gradle synchronization report |
-| [SYNC_QUICK_REFERENCE.md](SYNC_QUICK_REFERENCE.md) | Build sync quick reference card |
-| [ACTUATOR_FIX_SUMMARY.md](ACTUATOR_FIX_SUMMARY.md) | Actuator endpoint configuration |
-
-### **Data & Architecture**
-
-| Document | Description |
-|----------|-------------|
-| [DATA_ARCHITECTURE.md](DATA_ARCHITECTURE.md) | ⭐ Data architecture explanation (no database used) |
-| [HOW_TO_CHECK_DATA.md](HOW_TO_CHECK_DATA.md) | ⭐ Guide to viewing data in Jaeger, logs, and APIs |
-
-### **Quick References**
-
-| Document | Description |
-|----------|-------------|
-| [QUICK_START_FEIGN.md](QUICK_START_FEIGN.md) | Quick FeignClient commands and examples |
-| [GLOBAL_EXCEPTION_HANDLER_SUMMARY.md](GLOBAL_EXCEPTION_HANDLER_SUMMARY.md) | Exception handler quick reference |
-| [BEFORE_AFTER_COMPARISON.md](BEFORE_AFTER_COMPARISON.md) | Code comparison (RestTemplate vs FeignClient) |
-| [FINAL_IMPLEMENTATION_SUMMARY.md](FINAL_IMPLEMENTATION_SUMMARY.md) | Complete implementation summary |
-
----
 
 ## 🔧 Troubleshooting
 
