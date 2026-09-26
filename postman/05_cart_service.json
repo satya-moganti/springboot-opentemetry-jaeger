@@ -1,0 +1,164 @@
+{
+  "info": {
+    "name": "05 - Cart Service",
+    "description": "All scenarios for POST /cart/checkout — direct and via gateway. cart-service calls order-service which calls inventory-service.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gateway", "value": "http://localhost:8099" },
+    { "key": "direct", "value": "http://localhost:8300" }
+  ],
+  "item": [
+    {
+      "name": "Checkout - Single Item (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/cart-service/cart/checkout",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    { \"id\": \"product-1\", \"qty\": 1 }\n  ]\n}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Message correct', () => pm.expect(pm.response.json().message).to.eql('Checkout initiated'));",
+          "pm.test('Service is cart-service', () => pm.expect(pm.response.json().data.service).to.eql('cart-service'));",
+          "pm.test('orderResponse nested', () => pm.expect(pm.response.json().data.orderResponse).to.exist);",
+          "pm.test('orderId present in nested order', () => pm.expect(pm.response.json().data.orderResponse.data.orderId).to.be.a('string').and.not.empty);",
+          "pm.test('inventoryResponse nested inside order', () => pm.expect(pm.response.json().data.orderResponse.data.inventoryResponse).to.exist);",
+          "pm.test('Timestamp present', () => pm.expect(pm.response.json().timestamp).to.exist);",
+          "// Save traceId from response header for Jaeger lookup",
+          "var traceparent = pm.response.headers.get('traceparent');",
+          "if (traceparent) {",
+          "  var traceId = traceparent.split('-')[1];",
+          "  pm.collectionVariables.set('last_trace_id', traceId);",
+          "  console.log('traceId:', traceId);",
+          "}"
+        ]}
+      }]
+    },
+    {
+      "name": "Checkout - Multiple Items (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/cart-service/cart/checkout",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    { \"id\": \"product-1\", \"qty\": 2 },\n    { \"id\": \"product-2\", \"qty\": 1 }\n  ]\n}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('2 items in inventory response', () => {",
+          "  var items = pm.response.json().data.orderResponse.data.inventoryResponse.data.reservedItems;",
+          "  pm.expect(items).to.have.lengthOf(2);",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "Checkout - Large Cart (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/cart-service/cart/checkout",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    { \"id\": \"product-1\", \"qty\": 10 },\n    { \"id\": \"product-2\", \"qty\": 5 },\n    { \"id\": \"product-3\", \"qty\": 3 },\n    { \"id\": \"product-4\", \"qty\": 7 },\n    { \"id\": \"product-5\", \"qty\": 1 }\n  ]\n}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('5 items reserved', () => {",
+          "  var items = pm.response.json().data.orderResponse.data.inventoryResponse.data.reservedItems;",
+          "  pm.expect(items).to.have.lengthOf(5);",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "Checkout - Empty Items (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/cart-service/cart/checkout",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": []\n}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Checkout initiated with empty cart', () => pm.expect(pm.response.json().message).to.eql('Checkout initiated'));"
+        ]}
+      }]
+    },
+    {
+      "name": "Checkout - Missing items field (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/cart-service/cart/checkout",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "description": "No items key — propagates through chain, inventory-service throws, order returns 500, cart returns 500"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Returns 5xx', () => pm.expect(pm.response.code).to.be.oneOf([500, 503]));"
+        ]}
+      }]
+    },
+    {
+      "name": "Checkout - Invalid JSON (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/cart-service/cart/checkout",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "not-valid-json"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Returns 400', () => pm.response.to.have.status(400));"
+        ]}
+      }]
+    },
+    {
+      "name": "Checkout - Single Item (Direct)",
+      "request": {
+        "method": "POST",
+        "url": "{{direct}}/cart/checkout",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    { \"id\": \"product-1\", \"qty\": 1 }\n  ]\n}"
+        },
+        "description": "Direct call bypassing gateway"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Checkout initiated', () => pm.expect(pm.response.json().message).to.eql('Checkout initiated'));"
+        ]}
+      }]
+    }
+  ]
+}

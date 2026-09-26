@@ -1,0 +1,160 @@
+{
+  "info": {
+    "name": "01 - Infrastructure Health",
+    "description": "Health checks for Eureka, Config Server, Jaeger",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "host", "value": "localhost" },
+    { "key": "eureka_port", "value": "8761" },
+    { "key": "config_port", "value": "7100" },
+    { "key": "jaeger_port", "value": "16686" }
+  ],
+  "item": [
+    {
+      "name": "Eureka - Dashboard",
+      "request": {
+        "method": "GET",
+        "url": "http://{{host}}:{{eureka_port}}",
+        "description": "Eureka dashboard — all services should appear as registered"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Eureka dashboard reachable', () => pm.response.to.have.status(200));"
+        ]}
+      }]
+    },
+    {
+      "name": "Eureka - Actuator Health",
+      "request": {
+        "method": "GET",
+        "url": "http://{{host}}:{{eureka_port}}/actuator/health"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+        ]}
+      }]
+    },
+    {
+      "name": "Eureka - Registered Apps",
+      "request": {
+        "method": "GET",
+        "url": "http://{{host}}:{{eureka_port}}/eureka/apps",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "description": "Lists all registered service instances"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Applications present', () => pm.expect(pm.response.json().applications).to.exist);"
+        ]}
+      }]
+    },
+    {
+      "name": "Config Server - Actuator Health",
+      "request": {
+        "method": "GET",
+        "url": "http://{{host}}:{{config_port}}/actuator/health"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+        ]}
+      }]
+    },
+    {
+      "name": "Config Server - api-gateway config",
+      "request": {
+        "method": "GET",
+        "url": "http://{{host}}:{{config_port}}/api-gateway/default"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Correct service name', () => pm.expect(pm.response.json().name).to.eql('api-gateway'));"
+        ]}
+      }]
+    },
+    {
+      "name": "Config Server - cart-service config",
+      "request": {
+        "method": "GET",
+        "url": "http://{{host}}:{{config_port}}/cart-service/default"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Correct service name', () => pm.expect(pm.response.json().name).to.eql('cart-service'));"
+        ]}
+      }]
+    },
+    {
+      "name": "Config Server - order-service config",
+      "request": {
+        "method": "GET",
+        "url": "http://{{host}}:{{config_port}}/order-service/default"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Correct service name', () => pm.expect(pm.response.json().name).to.eql('order-service'));"
+        ]}
+      }]
+    },
+    {
+      "name": "Config Server - inventory-service config",
+      "request": {
+        "method": "GET",
+        "url": "http://{{host}}:{{config_port}}/inventory-service/default"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Correct service name', () => pm.expect(pm.response.json().name).to.eql('inventory-service'));"
+        ]}
+      }]
+    },
+    {
+      "name": "Jaeger UI - Reachable",
+      "request": {
+        "method": "GET",
+        "url": "http://{{host}}:{{jaeger_port}}"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Jaeger UI reachable', () => pm.response.to.have.status(200));"
+        ]}
+      }]
+    },
+    {
+      "name": "Jaeger API - List Services",
+      "request": {
+        "method": "GET",
+        "url": "http://{{host}}:{{jaeger_port}}/api/services",
+        "description": "Returns all services that have sent traces to Jaeger"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Data array present', () => pm.expect(pm.response.json().data).to.be.an('array'));",
+          "pm.test('At least one service', () => pm.expect(pm.response.json().data.length).to.be.above(0));",
+          "// Save services list for use in other requests",
+          "pm.collectionVariables.set('jaeger_services', JSON.stringify(pm.response.json().data));"
+        ]}
+      }]
+    }
+  ]
+}

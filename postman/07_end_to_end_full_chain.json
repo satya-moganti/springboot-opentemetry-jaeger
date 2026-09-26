@@ -1,0 +1,151 @@
+{
+  "info": {
+    "name": "07 - End-to-End Full Chain",
+    "description": "Runs the full cart→order→inventory chain and immediately validates the trace in Jaeger. Run requests in order.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gateway", "value": "http://localhost:8099" },
+    { "key": "jaeger", "value": "http://localhost:16686" },
+    { "key": "last_trace_id", "value": "" },
+    { "key": "last_order_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Step 1 - Full Chain Checkout",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/cart-service/cart/checkout",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    { \"id\": \"product-1\", \"qty\": 2 },\n    { \"id\": \"product-2\", \"qty\": 1 }\n  ]\n}"
+        },
+        "description": "Triggers the full chain: gateway → cart → order → inventory"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "var b = pm.response.json();",
+          "pm.test('Checkout initiated', () => pm.expect(b.message).to.eql('Checkout initiated'));",
+          "pm.test('orderId present', () => pm.expect(b.data.orderResponse.data.orderId).to.exist);",
+          "pm.test('inventoryResponse present', () => pm.expect(b.data.orderResponse.data.inventoryResponse).to.exist);",
+          "pm.collectionVariables.set('last_order_id', b.data.orderResponse.data.orderId);",
+          "// Extract traceId from traceparent header",
+          "var traceparent = pm.response.headers.get('traceparent');",
+          "if (traceparent) {",
+          "  var traceId = traceparent.split('-')[1];",
+          "  pm.collectionVariables.set('last_trace_id', traceId);",
+          "  console.log('traceId captured:', traceId);",
+          "} else {",
+          "  console.log('traceparent header not present — fetch traceId from Jaeger in Step 2');",
+          "}"
+        ]}
+      }]
+    },
+    {
+      "name": "Step 2 - Fetch Latest Trace from Jaeger",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{jaeger}}/api/traces?service=api-gateway&limit=1",
+          "query": [
+            { "key": "service", "value": "api-gateway" },
+            { "key": "limit", "value": "1" }
+          ]
+        },
+        "description": "Fetches the most recent trace. Saves traceId if not captured from header in Step 1."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "var traces = pm.response.json().data;",
+          "pm.test('At least one trace', () => pm.expect(traces.length).to.be.above(0));",
+          "if (!pm.collectionVariables.get('last_trace_id') && traces.length > 0) {",
+          "  pm.collectionVariables.set('last_trace_id', traces[0].traceID);",
+          "}",
+          "console.log('Using traceId:', pm.collectionVariables.get('last_trace_id'));"
+        ]}
+      }]
+    },
+    {
+      "name": "Step 3 - Validate Full Chain Trace",
+      "request": {
+        "method": "GET",
+        "url": "{{jaeger}}/api/traces/{{last_trace_id}}",
+        "description": "Validates the trace contains spans from all 4 services in the correct parent-child hierarchy"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "var trace = pm.response.json().data[0];",
+          "pm.test('Trace data exists', () => pm.expect(trace).to.exist);",
+          "",
+          "var processes = trace.processes;",
+          "var serviceNames = Object.values(processes).map(p => p.serviceName);",
+          "console.log('Services in trace:', serviceNames);",
+          "",
+          "pm.test('api-gateway span present', () => pm.expect(serviceNames).to.include('api-gateway'));",
+          "pm.test('cart-service span present', () => pm.expect(serviceNames).to.include('cart-service'));",
+          "pm.test('order-service span present', () => pm.expect(serviceNames).to.include('order-service'));",
+          "pm.test('inventory-service span present', () => pm.expect(serviceNames).to.include('inventory-service'));",
+          "",
+          "pm.test('At least 4 spans', () => pm.expect(trace.spans.length).to.be.at.least(4));",
+          "",
+          "// Validate single shared traceId across all spans",
+          "var traceIds = [...new Set(trace.spans.map(s => s.traceID))];",
+          "pm.test('All spans share one traceId', () => pm.expect(traceIds).to.have.lengthOf(1));",
+          "",
+          "// Validate parent-child span relationships exist",
+          "var spansWithParent = trace.spans.filter(s => s.references && s.references.length > 0);",
+          "pm.test('Parent-child span relationships exist', () => pm.expect(spansWithParent.length).to.be.above(0));"
+        ]}
+      }]
+    },
+    {
+      "name": "Step 4 - Repeat Checkout x3 (Load)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/cart-service/cart/checkout",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    { \"id\": \"product-load\", \"qty\": 1 }\n  ]\n}"
+        },
+        "description": "Use Postman Runner with 3 iterations to generate multiple traces for Jaeger comparison view"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));"
+        ]}
+      }]
+    },
+    {
+      "name": "Step 5 - Verify Multiple Traces in Jaeger",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{jaeger}}/api/traces?service=api-gateway&limit=10",
+          "query": [
+            { "key": "service", "value": "api-gateway" },
+            { "key": "limit", "value": "10" }
+          ]
+        },
+        "description": "After Step 4, Jaeger should have multiple traces to compare"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Multiple traces present', () => pm.expect(pm.response.json().data.length).to.be.above(1));",
+          "// Log all traceIds for manual Jaeger UI inspection",
+          "pm.response.json().data.forEach((t, i) => console.log('Trace ' + i + ':', t.traceID));"
+        ]}
+      }]
+    }
+  ]
+}

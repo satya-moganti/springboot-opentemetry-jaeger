@@ -1,0 +1,63 @@
+# Resilience4j Circuit Breaker Configuration for Cart Service
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        # Circuit breaker opens after 50% failure rate
+        failureRateThreshold: 50
+        # Minimum number of calls before calculating failure rate
+        minimumNumberOfCalls: 5
+        # Time the circuit stays open before transitioning to half-open
+        waitDurationInOpenState: 10s
+        # Number of calls in half-open state
+        permittedNumberOfCallsInHalfOpenState: 3
+        # Window size for calculating failure rate
+        slidingWindowSize: 10
+        # Type of sliding window: COUNT_BASED or TIME_BASED
+        slidingWindowType: COUNT_BASED
+        # Slow call threshold
+        slowCallDurationThreshold: 5s
+        slowCallRateThreshold: 100
+        # Automatically transition from open to half-open
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        
+    instances:
+      orderService:
+        baseConfig: default
+        # Override specific settings for order service if needed
+        waitDurationInOpenState: 15s
+        
+  # Retry Configuration
+  retry:
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 1s
+        retryExceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - java.io.IOException
+          - feign.FeignException.ServiceUnavailable
+          
+    instances:
+      orderService:
+        baseConfig: default
+        
+  # Timeout Configuration
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 10s
+        cancelRunningFuture: true
+        
+    instances:
+      orderService:
+        baseConfig: default
+        timeoutDuration: 15s
+
+# Feign Configuration
+feign:
+  circuitbreaker:
+    enabled: true
+    alphanumeric-ids:
+      enabled: true

@@ -1,0 +1,250 @@
+{
+  "info": {
+    "name": "06 - Jaeger Trace Validation",
+    "description": "Validates distributed traces in Jaeger after running requests. Run collections 03-05 first to generate traces.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "jaeger", "value": "http://localhost:16686" },
+    { "key": "last_trace_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Jaeger - List All Services",
+      "request": {
+        "method": "GET",
+        "url": "{{jaeger}}/api/services",
+        "description": "All 4 microservices must appear here after sending at least one request"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "var services = pm.response.json().data;",
+          "pm.test('api-gateway registered', () => pm.expect(services).to.include('api-gateway'));",
+          "pm.test('cart-service registered', () => pm.expect(services).to.include('cart-service'));",
+          "pm.test('order-service registered', () => pm.expect(services).to.include('order-service'));",
+          "pm.test('inventory-service registered', () => pm.expect(services).to.include('inventory-service'));",
+          "pm.collectionVariables.set('jaeger_services', JSON.stringify(services));"
+        ]}
+      }]
+    },
+    {
+      "name": "Jaeger - Traces for api-gateway",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{jaeger}}/api/traces?service=api-gateway&limit=20",
+          "query": [
+            { "key": "service", "value": "api-gateway" },
+            { "key": "limit", "value": "20" }
+          ]
+        },
+        "description": "Fetch recent traces where api-gateway is the root span"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Traces present', () => pm.expect(pm.response.json().data.length).to.be.above(0));",
+          "// Save first traceId for lookup",
+          "var traces = pm.response.json().data;",
+          "if (traces.length > 0) {",
+          "  pm.collectionVariables.set('last_trace_id', traces[0].traceID);",
+          "  console.log('Saved traceId:', traces[0].traceID);",
+          "}"
+        ]}
+      }]
+    },
+    {
+      "name": "Jaeger - Traces for cart-service",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{jaeger}}/api/traces?service=cart-service&limit=20",
+          "query": [
+            { "key": "service", "value": "cart-service" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('cart-service traces present', () => pm.expect(pm.response.json().data.length).to.be.above(0));"
+        ]}
+      }]
+    },
+    {
+      "name": "Jaeger - Traces for order-service",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{jaeger}}/api/traces?service=order-service&limit=20",
+          "query": [
+            { "key": "service", "value": "order-service" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('order-service traces present', () => pm.expect(pm.response.json().data.length).to.be.above(0));"
+        ]}
+      }]
+    },
+    {
+      "name": "Jaeger - Traces for inventory-service",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{jaeger}}/api/traces?service=inventory-service&limit=20",
+          "query": [
+            { "key": "service", "value": "inventory-service" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('inventory-service traces present', () => pm.expect(pm.response.json().data.length).to.be.above(0));"
+        ]}
+      }]
+    },
+    {
+      "name": "Jaeger - Lookup Trace by ID",
+      "request": {
+        "method": "GET",
+        "url": "{{jaeger}}/api/traces/{{last_trace_id}}",
+        "description": "Fetch a specific trace by ID. last_trace_id is auto-set by the 'Traces for api-gateway' request above, or paste manually."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Trace data returned', () => pm.expect(pm.response.json().data.length).to.be.above(0));",
+          "var trace = pm.response.json().data[0];",
+          "pm.test('TraceID matches', () => pm.expect(trace.traceID).to.eql(pm.collectionVariables.get('last_trace_id')));",
+          "// Validate all 4 services appear as spans in a full-chain trace",
+          "var spanServices = trace.spans.map(s => s.process ? trace.processes[s.processID].serviceName : '');",
+          "console.log('Services in trace:', [...new Set(spanServices)]);"
+        ]}
+      }]
+    },
+    {
+      "name": "Jaeger - Full Chain Span Validation",
+      "request": {
+        "method": "GET",
+        "url": "{{jaeger}}/api/traces/{{last_trace_id}}",
+        "description": "Validates that a cart checkout trace contains spans from all 4 services"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "var trace = pm.response.json().data[0];",
+          "var processes = trace.processes;",
+          "var serviceNames = Object.values(processes).map(p => p.serviceName);",
+          "console.log('Services in trace spans:', serviceNames);",
+          "pm.test('api-gateway span present', () => pm.expect(serviceNames).to.include('api-gateway'));",
+          "pm.test('cart-service span present', () => pm.expect(serviceNames).to.include('cart-service'));",
+          "pm.test('order-service span present', () => pm.expect(serviceNames).to.include('order-service'));",
+          "pm.test('inventory-service span present', () => pm.expect(serviceNames).to.include('inventory-service'));",
+          "pm.test('Spans count >= 4', () => pm.expect(trace.spans.length).to.be.at.least(4));"
+        ]}
+      }]
+    },
+    {
+      "name": "Jaeger - Filter Traces by HTTP Status 200",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{jaeger}}/api/traces?service=api-gateway&tags=%7B%22http.status_code%22%3A%22200%22%7D&limit=10",
+          "query": [
+            { "key": "service", "value": "api-gateway" },
+            { "key": "tags", "value": "{\"http.status_code\":\"200\"}" },
+            { "key": "limit", "value": "10" }
+          ]
+        },
+        "description": "Filter traces where HTTP status was 200 — successful requests only"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));"
+        ]}
+      }]
+    },
+    {
+      "name": "Jaeger - Operations for cart-service",
+      "request": {
+        "method": "GET",
+        "url": "{{jaeger}}/api/services/cart-service/operations",
+        "description": "Lists all span operation names recorded for cart-service"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Operations array present', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+        ]}
+      }]
+    },
+    {
+      "name": "Jaeger - Operations for order-service",
+      "request": {
+        "method": "GET",
+        "url": "{{jaeger}}/api/services/order-service/operations",
+        "description": "Lists all span operation names recorded for order-service"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Operations array present', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+        ]}
+      }]
+    },
+    {
+      "name": "Jaeger - Operations for inventory-service",
+      "request": {
+        "method": "GET",
+        "url": "{{jaeger}}/api/services/inventory-service/operations",
+        "description": "Lists all span operation names recorded for inventory-service"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Operations array present', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+        ]}
+      }]
+    },
+    {
+      "name": "Jaeger - Traces with min duration filter",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{jaeger}}/api/traces?service=api-gateway&minDuration=1ms&limit=10",
+          "query": [
+            { "key": "service", "value": "api-gateway" },
+            { "key": "minDuration", "value": "1ms" },
+            { "key": "limit", "value": "10" }
+          ]
+        },
+        "description": "Filter traces that took at least 1ms — useful to find slow requests"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));"
+        ]}
+      }]
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "info": {
+    "name": "02 - Service Status (via Gateway)",
+    "description": "GET / status endpoint for each microservice routed through the API Gateway",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gateway", "value": "http://localhost:8099" }
+  ],
+  "item": [
+    {
+      "name": "Gateway - cart-service status",
+      "request": {
+        "method": "GET",
+        "url": "{{gateway}}/cart-service/",
+        "description": "Routes to cart-service:8300/ — expects {service: cart-service, health: UP}"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Service is cart-service', () => {",
+          "  var b = pm.response.json();",
+          "  pm.expect(b.data.service).to.eql('cart-service');",
+          "  pm.expect(b.data.health).to.eql('UP');",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "Gateway - order-service status",
+      "request": {
+        "method": "GET",
+        "url": "{{gateway}}/order-service/",
+        "description": "Routes to order-service:8100/ — expects {service: order-service, health: UP}"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Service is order-service', () => {",
+          "  var b = pm.response.json();",
+          "  pm.expect(b.data.service).to.eql('order-service');",
+          "  pm.expect(b.data.health).to.eql('UP');",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "Gateway - inventory-service status",
+      "request": {
+        "method": "GET",
+        "url": "{{gateway}}/inventory-service/",
+        "description": "Routes to inventory-service:8900/ — expects {service: inventory-service, health: UP}"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Service is inventory-service', () => {",
+          "  var b = pm.response.json();",
+          "  pm.expect(b.data.service).to.eql('inventory-service');",
+          "  pm.expect(b.data.health).to.eql('UP');",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "Direct - cart-service status",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:8300/",
+        "description": "Direct call bypassing gateway — useful to isolate gateway vs service issues"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Health UP', () => pm.expect(pm.response.json().data.health).to.eql('UP'));"
+        ]}
+      }]
+    },
+    {
+      "name": "Direct - order-service status",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:8100/",
+        "description": "Direct call to order-service bypassing gateway"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Health UP', () => pm.expect(pm.response.json().data.health).to.eql('UP'));"
+        ]}
+      }]
+    },
+    {
+      "name": "Direct - inventory-service status",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:8900/",
+        "description": "Direct call to inventory-service bypassing gateway"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Health UP', () => pm.expect(pm.response.json().data.health).to.eql('UP'));"
+        ]}
+      }]
+    }
+  ]
+}

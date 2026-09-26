@@ -1,0 +1,151 @@
+{
+  "info": {
+    "name": "03 - Inventory Service",
+    "description": "All scenarios for POST /inventory/reserve — direct and via gateway",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gateway", "value": "http://localhost:8099" },
+    { "key": "direct", "value": "http://localhost:8900" }
+  ],
+  "item": [
+    {
+      "name": "Reserve - Single Item (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/inventory-service/inventory/reserve",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    { \"id\": \"product-1\", \"qty\": 1 }\n  ]\n}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Message correct', () => pm.expect(pm.response.json().message).to.eql('Items reserved successfully'));",
+          "pm.test('Service is inventory-service', () => pm.expect(pm.response.json().data.service).to.eql('inventory-service'));",
+          "pm.test('Reserved items returned', () => pm.expect(pm.response.json().data.reservedItems).to.be.an('array').with.lengthOf(1));",
+          "pm.test('Timestamp present', () => pm.expect(pm.response.json().timestamp).to.exist);"
+        ]}
+      }]
+    },
+    {
+      "name": "Reserve - Multiple Items (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/inventory-service/inventory/reserve",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    { \"id\": \"product-1\", \"qty\": 2 },\n    { \"id\": \"product-2\", \"qty\": 1 },\n    { \"id\": \"product-3\", \"qty\": 5 }\n  ]\n}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('All 3 items reserved', () => pm.expect(pm.response.json().data.reservedItems).to.have.lengthOf(3));"
+        ]}
+      }]
+    },
+    {
+      "name": "Reserve - Large Quantity (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/inventory-service/inventory/reserve",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    { \"id\": \"product-bulk\", \"qty\": 9999 }\n  ]\n}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Item reserved', () => pm.expect(pm.response.json().data.reservedItems[0].qty).to.eql(9999));"
+        ]}
+      }]
+    },
+    {
+      "name": "Reserve - Empty Items Array (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/inventory-service/inventory/reserve",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": []\n}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Empty reserved items', () => pm.expect(pm.response.json().data.reservedItems).to.be.an('array').that.is.empty);"
+        ]}
+      }]
+    },
+    {
+      "name": "Reserve - Missing items field (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/inventory-service/inventory/reserve",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "description": "No items key — inventory-service catches ClassCastException and returns 500"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Returns 500', () => pm.response.to.have.status(500));",
+          "pm.test('Error message present', () => pm.expect(pm.response.json().message).to.eql('Unexpected error occurred'));"
+        ]}
+      }]
+    },
+    {
+      "name": "Reserve - Invalid JSON body (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/inventory-service/inventory/reserve",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "not-valid-json"
+        },
+        "description": "Malformed JSON — Spring returns 400"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Returns 400', () => pm.response.to.have.status(400));"
+        ]}
+      }]
+    },
+    {
+      "name": "Reserve - Single Item (Direct)",
+      "request": {
+        "method": "POST",
+        "url": "{{direct}}/inventory/reserve",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    { \"id\": \"product-1\", \"qty\": 1 }\n  ]\n}"
+        },
+        "description": "Direct call bypassing gateway — validates service works independently"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Items reserved', () => pm.expect(pm.response.json().data.reservedItems).to.have.lengthOf(1));"
+        ]}
+      }]
+    }
+  ]
+}

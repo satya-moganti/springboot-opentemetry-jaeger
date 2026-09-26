@@ -1,0 +1,143 @@
+{
+  "info": {
+    "name": "04 - Order Service",
+    "description": "All scenarios for POST /orders/create — direct and via gateway. order-service calls inventory-service internally.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gateway", "value": "http://localhost:8099" },
+    { "key": "direct", "value": "http://localhost:8100" }
+  ],
+  "item": [
+    {
+      "name": "Create Order - Single Item (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/order-service/orders/create",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    { \"id\": \"product-1\", \"qty\": 1 }\n  ]\n}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Message correct', () => pm.expect(pm.response.json().message).to.eql('Order created successfully'));",
+          "pm.test('orderId present', () => pm.expect(pm.response.json().data.orderId).to.be.a('string').and.not.empty);",
+          "pm.test('Service is order-service', () => pm.expect(pm.response.json().data.service).to.eql('order-service'));",
+          "pm.test('inventoryResponse nested', () => pm.expect(pm.response.json().data.inventoryResponse).to.exist);",
+          "pm.test('Inventory reserved items present', () => {",
+          "  var inv = pm.response.json().data.inventoryResponse;",
+          "  pm.expect(inv.data.reservedItems).to.be.an('array').with.lengthOf(1);",
+          "});",
+          "// Save orderId for downstream use",
+          "pm.collectionVariables.set('last_order_id', pm.response.json().data.orderId);"
+        ]}
+      }]
+    },
+    {
+      "name": "Create Order - Multiple Items (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/order-service/orders/create",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    { \"id\": \"product-1\", \"qty\": 2 },\n    { \"id\": \"product-2\", \"qty\": 3 }\n  ]\n}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('orderId is UUID format', () => {",
+          "  var id = pm.response.json().data.orderId;",
+          "  pm.expect(id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);",
+          "});",
+          "pm.test('2 items reserved in inventory', () => {",
+          "  var items = pm.response.json().data.inventoryResponse.data.reservedItems;",
+          "  pm.expect(items).to.have.lengthOf(2);",
+          "});"
+        ]}
+      }]
+    },
+    {
+      "name": "Create Order - Empty Items (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/order-service/orders/create",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": []\n}"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('orderId generated even for empty items', () => pm.expect(pm.response.json().data.orderId).to.exist);"
+        ]}
+      }]
+    },
+    {
+      "name": "Create Order - Missing items field (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/order-service/orders/create",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "description": "No items key — inventory-service returns 500, order-service propagates error"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Returns 5xx', () => pm.expect(pm.response.code).to.be.oneOf([500, 503]));"
+        ]}
+      }]
+    },
+    {
+      "name": "Create Order - Invalid JSON (via Gateway)",
+      "request": {
+        "method": "POST",
+        "url": "{{gateway}}/order-service/orders/create",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "not-valid-json"
+        }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Returns 400', () => pm.response.to.have.status(400));"
+        ]}
+      }]
+    },
+    {
+      "name": "Create Order - Single Item (Direct)",
+      "request": {
+        "method": "POST",
+        "url": "{{direct}}/orders/create",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    { \"id\": \"product-1\", \"qty\": 1 }\n  ]\n}"
+        },
+        "description": "Direct call bypassing gateway"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('orderId present', () => pm.expect(pm.response.json().data.orderId).to.exist);"
+        ]}
+      }]
+    }
+  ]
+}

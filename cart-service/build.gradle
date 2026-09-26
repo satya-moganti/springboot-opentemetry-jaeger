@@ -1,0 +1,76 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.5'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.jayam'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    // Use Java 21 for compilation (best features and performance)
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+    
+    toolchain {
+        // Gradle will use Java 21 if available, but bytecode targets Java 17
+        // This means: Compile with Java 21, but JARs run on Java 17+
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+// Ensure bytecode compatibility with Java 17+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+}
+
+ext {
+    set('springCloudVersion', '2025.0.0')
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+
+    // FeignClient dependencies
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
+    
+    // Resilience4j dependencies for circuit breaker
+    implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
+    implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
+    implementation 'io.github.resilience4j:resilience4j-feign:2.2.0'
+
+    // Validation dependencies
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    
+    // JSON processing
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
+    // tracing deps
+    implementation 'io.micrometer:micrometer-tracing'
+    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+    
+    // CRITICAL: Feign client instrumentation for trace propagation
+    // This enables automatic trace context propagation through Feign clients
+    implementation 'io.github.openfeign:feign-micrometer'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
